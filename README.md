@@ -29,19 +29,20 @@ class HeroBase(SQLModel):
     secret_name: str
     age: Optional[int] = None
 
+# API schema is often different from Database
 class Hero(HeroBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(index=True)
-
-# 2. Initialize the FastMVP Engine
-# This handles FastAPI instantiation and SQLite engine setup
-api = FastMVPEngine("HeroService", "dev_db")
-app = api.app
 
 # 3. Define a Simple Mapper
 # Used to transform incoming API data into Database models
 def hero_mapper(incoming: Hero) -> Hero:
     return incoming
+
+# 2. Initialize the FastMVP Engine
+# This handles FastAPI instantiation and SQLite engine setup
+api = FastMVPEngine("HeroService", "dev_db")
+app = api.app
 
 # 4. Fluent Route Registration
 # This single chain creates GET (all), POST, GET (by id), and DELETE (by age)
