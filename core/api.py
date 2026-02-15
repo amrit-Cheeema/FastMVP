@@ -43,8 +43,9 @@ class ModelRouter:
                 "content": {"application/json": {}}
             }
         }
-        @self.app.get(f"/models/{self.name}/{name}", response_model=self.model, responses=responses_schema)
-        async def get(lookup_id: int, session: Session = Depends(self.get_session)):
+        
+        async def get(session: Session = Depends(self.get_session), **kwargs):
+            lookup_id = kwargs.get(name)
             # lookup_ptr is the model attribute, e.g., self.model.id
             statement = select(self.model).where(lookup_ptr == lookup_id)
             result = session.exec(statement).first()
@@ -53,6 +54,9 @@ class ModelRouter:
                 return Response(content="{}", media_type="application/json", status_code=status.HTTP_404_NOT_FOUND)
                 
             return result
+        path = f"/models/{self.name}/{{{name}}}"
+        rename_path_argument(get, dynamic_name=name)
+        self.app.get(path, response_model=self.model, responses=responses_schema)(get)
         return self
     def get_all(self, max:int, offset:int=0, limit:int=100):
         """
@@ -66,12 +70,14 @@ class ModelRouter:
         Returns:
             self: Returns the current instance to allow for method chaining.
         """
-        @self.app.get(f"/models/{self.name}", response_model=Sequence[self.model])
+        @self.app.get(f"/models/{self.name}", response_model=Sequence[self.model], summary=f"Get All {self.name}s", description=f"Get all {self.name}s in the database. Max number of output = {max}")
         async def get_all(session: Session = Depends(self.get_session), offset: int = offset, limit: int = limit):
+            
             if limit > max:
                 limit = max
             statement = select(self.model).offset(offset).limit(limit)
             return session.exec(statement).all()
+        
         return self
 
     def post(self, POST: Type[S], request_mapper: Callable[[S], T]):
@@ -157,7 +163,6 @@ class ModelRouter:
         path = f"/models/{self.name}/{{{name}}}"
         rename_path_argument(delete_item, dynamic_name=name)
         self.app.delete(path, responses=responses_schema)(delete_item)
-        self.routes.append(path)
         return self
 
 
