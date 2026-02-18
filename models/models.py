@@ -1,8 +1,11 @@
 from typing import Optional
 from sqlmodel import Field, SQLModel
 
-class Hero(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
-    name: str = Field(index=True)
-    secret_name: str
-    age: Optional[int] = None
+class Logs(SQLModel, table=True):
+    id: int
+    timestamp: int
+    ip: str
+    Method: str
+    path: str
+    status_code: int
+    error: str

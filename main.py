@@ -1,8 +1,14 @@
+from typing import Callable
 from core.api import FastMVPEngine
 from typing import Optional, Annotated
 from sqlmodel import Field, SQLModel
-from fastapi import Depends
+from fastapi import Depends, Request
 from fastapi.security import OAuth2PasswordBearer
+from prpc import greet_pb2
+from prpc import greet_pb2_grpc
+import grpc
+from loguru import logger
+import sys
 
 # 1. Define your Database Schema
 class HeroBase(SQLModel):
@@ -14,12 +20,11 @@ class HeroDB(HeroBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     secret_name: str
 
-# 3. Inherit for the API (Input)
+
 class HeroAPI(HeroBase):
     pass
 
-# 3. Define a Simple Mapper
-# Used to transform incoming API data into Database models
+
 def Hero_mapper(incoming: HeroAPI) -> HeroDB:
     return HeroDB(
         id=1,
@@ -27,24 +32,38 @@ def Hero_mapper(incoming: HeroAPI) -> HeroDB:
         **incoming.model_dump()
     )
 
-# 2. Initialize the FastMVP Engine
-# This handles FastAPI instantiation and SQLite engine setup
+
 api = FastMVPEngine("HeroService", "dev_db")
 app = api.app
 
-# 4. Fluent Route Registration
-# This single chain creates GET (all), POST, GET (by id), and DELETE (by age)
+@app.middleware("http")
+async def catch_exceptions_middleware(request: Request, call_next):
+    with logger.catch(reraise=True):
+        return await call_next(request)
+
 api.register_model(HeroDB, "hero") \
     .get_all(max=100) \
     .post(HeroAPI, Hero_mapper) \
     .get(HeroDB.id, "id") \
     .delete(HeroDB.age, "age")
 
-# 5. Standard FastAPI Extensibility
-# FastMVP is non-intrusive; you can still add custom endpoints and security
+class Microservice:
+    def __init__(self):
+        pass
+    def get(self, handler: Callable):
+        pass
 
+def run():
+    # Use 'insecure_channel' for local development
+    with grpc.insecure_channel('localhost:50051') as channel:
+        stub = greet_pb2_grpc.GreeterStub(channel)
+        response = stub.SayHello(greet_pb2.HelloRequest(name="hello"))
+        print(response)
+        # response = stub.SayHello(request) # Uncomment when server is running
+
+run()
 
 @app.get("/BLE/start")
 async def start_scan(timout: int):
-    
+
     return

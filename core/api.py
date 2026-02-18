@@ -1,11 +1,12 @@
 from typing import Type, List, TypeVar, Sequence, Callable, Dict, Any, Union
-from fastapi import FastAPI, Depends, HTTPException
-from fastapi.responses import HTMLResponse # Added this
+from fastapi import FastAPI, Depends, HTTPException, Request
+from fastapi.responses import HTMLResponse, PlainTextResponse
 from fastapi import HTTPException, status, Depends, Response
 from sqlalchemy.exc import IntegrityError
 from core.utils import rename_path_argument
 from sqlmodel import Session, SQLModel, create_engine, select
-
+from loguru import logger
+import sys
 
 # T is Database Model (defined at class level)
 # S is Request Schema (defined specifically for the post method)
@@ -22,12 +23,13 @@ class ModelRouter:
         name (str): The resource name used in URL paths.
         get_session (Callable): Dependency provider for database sessions.
     """
-    def __init__(self, app: FastAPI, model: Type[T], name: str, get_session):
+    def __init__(self, app: FastAPI, model: Type[T], name: str, get_session, logger):
         self.app = app
         self.model = model
         self.name = name
         self.get_session = get_session
         self.routes: List[str] = []
+        self.logger = logger
         
     def get(self, lookup_ptr, name: str):
         """
@@ -103,8 +105,10 @@ class ModelRouter:
                     status_code=status.HTTP_409_CONFLICT,
                     detail=f"Resource already exists. Unique constraint violation"
                 )
+            
             except Exception as e:
                 session.rollback()
+                self.logger.exception("Database transaction failed")
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail="An unexpected error occurred while creating the record."
@@ -172,8 +176,12 @@ class FastMVPEngine:
     def __init__(self, name: str, db_name: str = "database"):
         self.engine = create_engine(f"sqlite:///{db_name}.db")
         self.app = FastAPI(title=name)
+        self.logger = logger
+        self._setup_logging()
         self._setup_docs()
         self._setup_db()
+        self._setup_log_viewer()
+        
 
     def _setup_docs(self):
         # Instead of calling an external module, we define the route here
@@ -203,14 +211,92 @@ class FastMVPEngine:
             </html>
             """)
 
+    def _setup_logging(self):
+        self.logger.remove()
+    
+        # Define a clean format (standard for both)
+        log_format = (
+            "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
+            "<level>{level: <8}</level> | "
+            "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - "
+            "<level>{message}</level>"
+        )
+
+        # 2. Add Console (sys.stderr)
+        self.logger.add(
+            sys.stderr, 
+            format=log_format,
+            backtrace=True, 
+            diagnose=True, 
+            enqueue=True,
+            level="ERROR"
+        )
+
+        # 3. Add File (Logs stored in 'app.log')
+        # serialize=False keeps it human-readable; use True for JSON
+        self.log_file = "app.log"
+        self.logger.add(
+            self.log_file,
+            format=log_format,
+            rotation="10 MB",  # Create new file every 10MB
+            retention="7 days", # Keep logs for a week
+            backtrace=True,
+            diagnose=True,
+            enqueue=True
+        )
+
+        # 4. Middleware for "Everywhere" Catching
+        @self.app.middleware("http")
+        async def log_and_catch_middleware(request: Request, call_next):
+        # 1. Capture Request Details
+            path = request.url.path
+            method = request.method
+            ip = request.client.host
+
+            # 2. Use logger.catch to flag errors automatically
+            with self.logger.catch(reraise=True):
+                response = await call_next(request)
+                
+                # 3. Capture Response Body
+                # We iterate over the response body to log it
+                response_body = b""
+                async for chunk in response.body_iterator:
+                    response_body += chunk
+                
+                # 4. Determine Log Level based on Status
+                status_code = response.status_code
+                level = "INFO" if status_code < 400 else "ERROR"
+                
+                self.logger.log(
+                    level, 
+                    f"IP: {ip} | {method} {path} | Status: {status_code}"
+                )
+
+                # 5. Reconstruct the response (since we consumed the stream)
+                return Response(
+                    content=response_body,
+                    status_code=response.status_code,
+                    headers=dict(response.headers),
+                    media_type=response.media_type
+                )
+
     def _setup_db(self):
+        @self.logger.catch
         @self.app.on_event("startup")
         def on_startup():
             SQLModel.metadata.create_all(self.engine)
 
+    def _setup_log_viewer(self):
+        @self.app.get("/admin/logs", response_class=PlainTextResponse)
+        async def view_logs():
+            try:
+                with open(self.log_file, "r") as f:
+                    return f.read()
+            except FileNotFoundError:
+                return "No logs found yet."
     def get_session(self):
         with Session(self.engine) as session:
             yield session
     
     def register_model(self, model_class: Type[SQLModel], name: str):
-        return ModelRouter(self.app, model_class, name, self.get_session)
+        return ModelRouter(self.app, model_class, name, self.get_session, self.logger)

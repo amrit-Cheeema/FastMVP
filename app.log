@@ -1,0 +1,12 @@
+2026-02-18 09:31:25 | INFO     | core.api:log_and_catch_middleware:269 - IP: 127.0.0.1 | GET /admin/logs | Status: 200
+2026-02-18 09:31:28 | INFO     | core.api:log_and_catch_middleware:269 - IP: 127.0.0.1 | GET /admin/logs | Status: 200
+2026-02-18 09:31:29 | INFO     | core.api:log_and_catch_middleware:269 - IP: 127.0.0.1 | GET /admin/logs | Status: 200
+2026-02-18 09:31:30 | INFO     | core.api:log_and_catch_middleware:269 - IP: 127.0.0.1 | GET /admin/logs | Status: 200
+2026-02-18 09:37:02 | INFO     | core.api:log_and_catch_middleware:269 - IP: 127.0.0.1 | GET /openapi.json | Status: 200
+2026-02-18 11:35:10 | INFO     | core.api:log_and_catch_middleware:269 - IP: 127.0.0.1 | GET /openapi.json | Status: 200
+2026-02-18 11:35:54 | INFO     | core.api:log_and_catch_middleware:270 - IP: 127.0.0.1 | GET /openapi.json | Status: 200
+2026-02-18 11:35:56 | INFO     | core.api:log_and_catch_middleware:270 - IP: 127.0.0.1 | GET /apiDocs | Status: 200
+2026-02-18 11:35:56 | INFO     | core.api:log_and_catch_middleware:270 - IP: 127.0.0.1 | GET /openapi.json | Status: 200
+2026-02-18 11:40:24 | INFO     | core.api:log_and_catch_middleware:270 - IP: 127.0.0.1 | GET /admin/logs | Status: 200
+2026-02-18 11:40:26 | INFO     | core.api:log_and_catch_middleware:270 - IP: 127.0.0.1 | GET /admin/logs | Status: 200
+2026-02-18 11:40:27 | INFO     | core.api:log_and_catch_middleware:270 - IP: 127.0.0.1 | GET /admin/logs | Status: 200

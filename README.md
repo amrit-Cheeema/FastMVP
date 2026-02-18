@@ -67,3 +67,10 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 @app.get("/items/")
 async def read_items(token: Annotated[str, Depends(oauth2_scheme)]):
     return {"token": token}
+```
+The idea is to implement this archeture with minimal boilerplate and
+good extensibility
+![alt text](image.png)
+
+
+Working on Microservice Arcetecture

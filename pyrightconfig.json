@@ -1,0 +1,6 @@
+{
+    "typeCheckingMode": "basic",
+    "extraPaths": ["./prpc"],
+    "indexing": true,
+    "venvPath": ".",
+}
