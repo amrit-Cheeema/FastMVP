@@ -9,6 +9,9 @@ from prpc import greet_pb2_grpc
 import grpc
 from loguru import logger
 import sys
+from contextlib import asynccontextmanager
+
+
 
 # 1. Define your Database Schema
 class HeroBase(SQLModel):
@@ -48,22 +51,56 @@ api.register_model(HeroDB, "hero") \
     .delete(HeroDB.age, "age")
 
 class Microservice:
-    def __init__(self):
-        pass
-    def get(self, handler: Callable):
-        pass
+    def __init__(self, target: str):
+        self.target = target
+        self.channel = None
+        self.stub = None
 
-def run():
-    # Use 'insecure_channel' for local development
-    with grpc.insecure_channel('localhost:50051') as channel:
-        stub = greet_pb2_grpc.GreeterStub(channel)
-        response = stub.SayHello(greet_pb2.HelloRequest(name="hello"))
-        print(response)
-        # response = stub.SayHello(request) # Uncomment when server is running
+    async def connect(self):
+        # Use secure_channel(self.target, grpc.ssl_channel_credentials()) if needed
+        self.channel = grpc.aio.insecure_channel(self.target)
+        self.stub = greet_pb2_grpc.GreeterStub(self.channel)
+        logger.info(f"gRPC connected to {self.target}")
 
-run()
+    async def send_req(self, name: str):
+        try:
+            req = greet_pb2.HelloRequest(name=name)
+            # Ensure we call the stub asynchronously
+            if self.stub:
+                res = await self.stub.SayHello(req)
+                
+                
+                return res
+            else:
+                logger.error(f"gRPC call failed: No self.stub")
+        except grpc.RpcError as e:
+            logger.error(f"gRPC call failed: {e.code()} - {e.details()}")
+            raise 
+
+    async def close(self):
+        if self.channel:
+            await self.channel.close()
+            logger.info("gRPC connection closed")
+
+# Initialize the object, but don't connect yet!
+grpc_service = Microservice('localhost:50051')
+
+@asynccontextmanager
+async def lifespan(app):
+    # This happens BEFORE the API starts
+    await grpc_service.connect()
+    yield
+    # This happens AFTER the API stops
+    await grpc_service.close()
+app.router.lifespan_context = lifespan
 
 @app.get("/BLE/start")
-async def start_scan(timout: int):
+async def start_scan():
+    try:
+        
+        response = await grpc_service.send_req(f"Scan-with-")
+        print(response)
+        return {"message": response.message, "status": "success"}
+    except Exception as e:
+        return {"error": str(e), "status": "failed"}
 
-    return
