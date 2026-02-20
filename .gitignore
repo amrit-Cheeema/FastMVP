@@ -1,0 +1,4 @@
+venv/**
+app.log
+dev_db.db
+error.log

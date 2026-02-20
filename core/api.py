@@ -213,8 +213,7 @@ class FastMVPEngine:
 
     def _setup_logging(self):
         self.logger.remove()
-    
-        # Define a clean format (standard for both)
+
         log_format = (
             "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
             "<level>{level: <8}</level> | "
@@ -222,49 +221,52 @@ class FastMVPEngine:
             "<level>{message}</level>"
         )
 
-        # 2. Add Console (sys.stderr)
+        # 1. Console Output (Shows everything INFO and above)
         self.logger.add(
             sys.stderr, 
             format=log_format,
-            backtrace=True, 
-            diagnose=True, 
-            enqueue=True,
-            level="ERROR"
-        )
-
-        # 3. Add File (Logs stored in 'app.log')
-        # serialize=False keeps it human-readable; use True for JSON
-        self.log_file = "app.log"
-        self.logger.add(
-            self.log_file,
-            format=log_format,
-            rotation="10 MB",  # Create new file every 10MB
-            retention="7 days", # Keep logs for a week
-            backtrace=True,
-            diagnose=True,
+            level="INFO",
             enqueue=True
         )
 
-        # 4. Middleware for "Everywhere" Catching
+        # 2. General Log File (All events: INFO, WARNING, ERROR, CRITICAL)
+        self.logger.add(
+            "app.log",
+            format=log_format,
+            rotation="10 MB",
+            retention="7 days",
+            level="INFO",
+            enqueue=True
+        )
+
+        # 3. Error Log File (ONLY ERROR and CRITICAL)
+        self.logger.add(
+            "error.log",
+            format=log_format,
+            rotation="10 MB",
+            retention="30 days", # Usually keep errors longer
+            backtrace=True,
+            diagnose=True,
+            level="ERROR",  # This is the key filter
+            enqueue=True
+        )
+
         @self.app.middleware("http")
         async def log_and_catch_middleware(request: Request, call_next):
-        # 1. Capture Request Details
             path = request.url.path
             method = request.method
             ip = request.client.host
 
-            # 2. Use logger.catch to flag errors automatically
             with self.logger.catch(reraise=True):
                 response = await call_next(request)
                 
-                # 3. Capture Response Body
-                # We iterate over the response body to log it
+                # Consume body to log it
                 response_body = b""
                 async for chunk in response.body_iterator:
                     response_body += chunk
                 
-                # 4. Determine Log Level based on Status
                 status_code = response.status_code
+                # Assign level based on status
                 level = "INFO" if status_code < 400 else "ERROR"
                 
                 self.logger.log(
@@ -272,10 +274,9 @@ class FastMVPEngine:
                     f"IP: {ip} | {method} {path} | Status: {status_code}"
                 )
 
-                # 5. Reconstruct the response (since we consumed the stream)
                 return Response(
                     content=response_body,
-                    status_code=response.status_code,
+                    status_code=status_code,
                     headers=dict(response.headers),
                     media_type=response.media_type
                 )

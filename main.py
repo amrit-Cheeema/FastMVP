@@ -4,13 +4,11 @@ from typing import Optional, Annotated
 from sqlmodel import Field, SQLModel
 from fastapi import Depends, Request
 from fastapi.security import OAuth2PasswordBearer
-from prpc import greet_pb2
-from prpc import greet_pb2_grpc
-import grpc
-from loguru import logger
+from core.microservice import Microservice
 import sys
 from contextlib import asynccontextmanager
-
+from prpc import greet_pb2
+from prpc import greet_pb2_grpc
 
 
 # 1. Define your Database Schema
@@ -39,10 +37,6 @@ def Hero_mapper(incoming: HeroAPI) -> HeroDB:
 api = FastMVPEngine("HeroService", "dev_db")
 app = api.app
 
-@app.middleware("http")
-async def catch_exceptions_middleware(request: Request, call_next):
-    with logger.catch(reraise=True):
-        return await call_next(request)
 
 api.register_model(HeroDB, "hero") \
     .get_all(max=100) \
@@ -50,50 +44,19 @@ api.register_model(HeroDB, "hero") \
     .get(HeroDB.id, "id") \
     .delete(HeroDB.age, "age")
 
-class Microservice:
-    def __init__(self, target: str):
-        self.target = target
-        self.channel = None
-        self.stub = None
-
-    async def connect(self):
-        # Use secure_channel(self.target, grpc.ssl_channel_credentials()) if needed
-        self.channel = grpc.aio.insecure_channel(self.target)
-        self.stub = greet_pb2_grpc.GreeterStub(self.channel)
-        logger.info(f"gRPC connected to {self.target}")
-
-    async def send_req(self, name: str):
-        try:
-            req = greet_pb2.HelloRequest(name=name)
-            # Ensure we call the stub asynchronously
-            if self.stub:
-                res = await self.stub.SayHello(req)
-                
-                
-                return res
-            else:
-                logger.error(f"gRPC call failed: No self.stub")
-        except grpc.RpcError as e:
-            logger.error(f"gRPC call failed: {e.code()} - {e.details()}")
-            raise 
-
-    async def close(self):
-        if self.channel:
-            await self.channel.close()
-            logger.info("gRPC connection closed")
 
 # Initialize the object, but don't connect yet!
-grpc_service = Microservice('localhost:50051')
+grpc_service = Microservice("greeting servic", "localhost:50051", api, greet_pb2_grpc.GreeterStub)
 
-@asynccontextmanager
-async def lifespan(app):
-    # This happens BEFORE the API starts
-    await grpc_service.connect()
-    yield
-    # This happens AFTER the API stops
-    await grpc_service.close()
-app.router.lifespan_context = lifespan
-
+# @asynccontextmanager
+# async def lifespan(app):
+#     # This happens BEFORE the API starts
+#     await grpc_service.connect()
+#     yield
+#     # This happens AFTER the API stops
+#     await grpc_service.close()
+# app.router.lifespan_context = lifespan
+grpc_service
 @app.get("/BLE/start")
 async def start_scan():
     try:
