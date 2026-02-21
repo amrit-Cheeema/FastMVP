@@ -1,5 +1,5 @@
 from typing import Callable
-from core.api import FastMVPEngine
+from core.engine import FastMVPEngine
 from typing import Optional, Annotated
 from sqlmodel import Field, SQLModel
 from fastapi import Depends, Request
@@ -46,7 +46,7 @@ api.register_model(HeroDB, "hero") \
 
 
 # Initialize the object, but don't connect yet!
-grpc_service = Microservice("greeting servic", "localhost:50051", api, greet_pb2_grpc.GreeterStub)
+grpc_service = Microservice("greeting service", "localhost:50051", api, greet_pb2_grpc.GreeterStub)
 
 # @asynccontextmanager
 # async def lifespan(app):
@@ -56,14 +56,18 @@ grpc_service = Microservice("greeting servic", "localhost:50051", api, greet_pb2
 #     # This happens AFTER the API stops
 #     await grpc_service.close()
 # app.router.lifespan_context = lifespan
-grpc_service
+
 @app.get("/BLE/start")
 async def start_scan():
     try:
-        
-        response = await grpc_service.send_req(f"Scan-with-")
-        print(response)
-        return {"message": response.message, "status": "success"}
+        if grpc_service.healthy:
+            response = await grpc_service.send_req(f"Amrit")
+            if response:
+                return {"message": response.message, "status": "success"}
+            else:
+                return {"message": "No response", "status": "failed"}
+        else:
+            return {"message": "Not healthy", "status": "failed"}
     except Exception as e:
         return {"error": str(e), "status": "failed"}
 

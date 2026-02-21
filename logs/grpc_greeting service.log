@@ -1,0 +1,2 @@
+2026-02-20 23:35:21.419 | ERROR    | core.microservice:_maintain_connection:85 - gRPC Service 'greeting service' is OFFLINE (State: ChannelConnectivity.IDLE).
+2026-02-20 23:35:26.420 | INFO     | core.microservice:_maintain_connection:83 - gRPC Service 'greeting service' is ONLINE.

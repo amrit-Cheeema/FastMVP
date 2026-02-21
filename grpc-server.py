@@ -20,7 +20,7 @@ class Greeter(greet_pb2_grpc.GreeterServicer):
         if not user_name:
             logger.warning("Empty name received!")
             return greet_pb2.HelloReply(message="Hello, stranger!")
-            
+        
         return greet_pb2.HelloReply(message=f"Hello, {user_name}! Your request was logged.")
 
 def serve():
